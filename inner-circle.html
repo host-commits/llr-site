@@ -526,14 +526,15 @@ function selectTier(tier) {
   document.getElementById('opt-elite').className = 'tier-option' + (tier === 'elite' ? ' selected-elite' : '');
 }
 
-// Form submit
-function submitForm() {
-  const name = document.getElementById('f-name').value.trim();
-  const email = document.getElementById('f-email').value.trim();
-  const role = document.getElementById('f-role').value.trim();
+// Form submit — wired to MailerLite
+async function submitForm() {
+  const fullName = document.getElementById('f-name').value.trim();
+  const email    = document.getElementById('f-email').value.trim();
+  const role     = document.getElementById('f-role').value.trim();
+  const team     = document.getElementById('f-team').value.trim();
   const situation = document.getElementById('f-situation').value.trim();
 
-  if (!name || !email || !role || !situation) {
+  if (!fullName || !email || !role || !situation) {
     alert('Please complete all required fields before submitting.');
     return;
   }
@@ -542,11 +543,64 @@ function submitForm() {
     return;
   }
 
-  // In production: POST to MailerLite API or Zapier webhook
-  // For now: show success state
-  document.getElementById('interest-form-fields').style.display = 'none';
-  document.getElementById('form-success').style.display = 'block';
-  document.getElementById('form-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Split name into first / last
+  const nameParts  = fullName.split(' ');
+  const firstName  = nameParts[0] || fullName;
+  const lastName   = nameParts.slice(1).join(' ') || '';
+  const tierChoice = selectedTier || 'not selected';
+
+  // Disable button while submitting
+  const btn = document.querySelector('.form-submit');
+  btn.textContent = 'Submitting...';
+  btn.disabled = true;
+
+  try {
+    const response = await fetch('https://connect.mailerlite.com/api/subscribers', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJhdWQiOiI0IiwianRpIjoiMGEzNmJhMTkxZTIxMzQ5MjVmZGYwNTBmYjNjMzAwMzFkMDMzNTgzYTc0ODk5YmY3NDRhMzBlZGMyMWI2ZDY4ODA5NTczNDc1MjQ0YjU0YjUiLCJpYXQiOjE3ODAzNTMyNDIuMTQyNDM1LCJuYmYiOjE3ODAzNTMyNDIuMTQyNDM3LCJleHAiOjQ5MzYwMjY4NDIuMTM4MjM1LCJzdWIiOiIxODQ4MjE5Iiwic2NvcGVzIjpbXX0.uPT5LNVEUGXZn6buIPC6vtqERImCoXzmKM6LEWViDY3eSB60jxPlFTkDOThejkoFVHKXRB5YePINw-bk08Z2OyTkPVh7Dlx9JvmbMXuS8TYEyOSvHmTvFJ_RFge3bGZ2ocY8UW924OcKECjwnlysLwnbqpsB71LatFn_JO66-J2TbCiLcoM9-X4cQvuPbALizOcE0S_xdhntsA73lmkVJKoPlTo33IW30EFA1nG19VKp8X1hqJtW-oPcmw64o4vi9Xp5lesNJXs_l9mCFmfeMymYqUghd2BhGDpYMEynJFORJodSkHrDjuLICTdy34t0KBOtoLEl9JXmUZv9NbXwv_CRLabyyHvmzdkgC8TBudgQzh0rS22LQoOblf4JrgPdWYEfc5CFqhnhhozx7fiiYg9OppceHGBLSUP_J_KCo1numEbkMUSxDA_qpDbnwDB06yX9hMrQIqQxS9J9e9_Duy_x7GjYz01MJNUJ-5d5t6NRr15_raVpF8TuvOyvcbRsDKhpYj-nbovV5eDPZ_g_x7IDKCGYtcy6IMLwtyKNS1bpSM-TK3g5naW-jHitIdbuoGLqEDkm5Rhp3_tmBZYVwFn4ZWuk-QzXvVJg-KXG85n4dh5gg7rtTZuGlVZeIRethjDxOA80PAh8u188NgPpCaVz_JzPqRd6xZjBmoRwIb8'
+      },
+      body: JSON.stringify({
+        email: email,
+        fields: {
+          name:      firstName,
+          last_name: lastName,
+          company:   role,
+          city:      team,
+          phone:     situation.substring(0, 255),
+          z_i_p:     tierChoice
+        },
+        groups: ['189113098529932848'],
+        status: 'active'
+      })
+    });
+
+    const data = await response.json();
+
+    if (response.ok || response.status === 200 || response.status === 201) {
+      // Success
+      document.getElementById('interest-form-fields').style.display = 'none';
+      document.getElementById('form-success').style.display = 'block';
+      document.getElementById('form-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } else {
+      // Already subscribed is fine — still show success
+      if (data.message && data.message.toLowerCase().includes('already')) {
+        document.getElementById('interest-form-fields').style.display = 'none';
+        document.getElementById('form-success').style.display = 'block';
+        document.getElementById('form-success').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        btn.textContent = 'Add My Name to the List →';
+        btn.disabled = false;
+        alert('Something went wrong. Please try again or email Host@leadershiplockerroom.net directly.');
+      }
+    }
+  } catch (err) {
+    btn.textContent = 'Add My Name to the List →';
+    btn.disabled = false;
+    alert('Something went wrong. Please try again or email Host@leadershiplockerroom.net directly.');
+  }
 }
 
 // Smooth nav background on scroll
